@@ -168,10 +168,9 @@ void submit(infinilm::runtime::Runtime &runtime, RecordingPolicy policy,
     const bool capture_safe = policy != RecordingPolicy::HostOnly && instance->capture_safe();
     runtime.addGraphOperator(std::make_shared<infinilm::execution::graph::RecordedCall>(
         [recorded = std::move(recorded), instance = std::move(instance),
-         workspace = std::move(workspace), owner = runtime.shared_from_this()]() mutable {
+         workspace = std::move(workspace), owner = runtime.shared_from_this()](infini::ops::Handle &handle) mutable {
             owner->assertOwnerThread();
             infini::rt::DeviceGuard guard{owner->device().type(), owner->device().index(), true};
-            infini::ops::Handle handle;
             handle.set_stream(owner->stream());
             if (workspace) {
                 handle.set_workspace(workspace->data());

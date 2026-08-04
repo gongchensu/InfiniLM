@@ -69,7 +69,7 @@ public:
     bool isGraphRecording() const;
     void startGraphRecording(bool require_device_graph = false);
     void addGraphOperator(std::shared_ptr<::infinilm::execution::graph::RecordedCall> op);
-    std::shared_ptr<::infinilm::execution::graph::Graph> stopGraphRecording();
+    std::shared_ptr<::infinilm::execution::graph::Graph> stopGraphRecording(const void *lengths_input = nullptr, size_t batch = 0);
     void cancelGraphRecording() noexcept;
 
     friend class ::infinilm::execution::graph::Graph;

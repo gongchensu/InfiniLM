@@ -439,7 +439,7 @@ void Runtime::addGraphOperator(std::shared_ptr<::infinilm::execution::graph::Rec
     return graph_manager_->add_operator(op);
 }
 
-std::shared_ptr<::infinilm::execution::graph::Graph> Runtime::stopGraphRecording() {
+std::shared_ptr<::infinilm::execution::graph::Graph> Runtime::stopGraphRecording(const void *lengths_input, size_t batch) {
     if (!graph_manager_->is_recording()) {
         return graph_manager_->stop_recording();
     }
@@ -471,6 +471,8 @@ std::shared_ptr<::infinilm::execution::graph::Graph> Runtime::stopGraphRecording
     }
     graph->retain_runtime(shared_from_this(), std::move(allocation_lease));
     try {
+        graph->lengths_input_ = lengths_input;
+        graph->sequence_lengths_.assign(batch, 1);
         graph->instantiate();
     } catch (...) {
         graph_manager_->finish_recording();

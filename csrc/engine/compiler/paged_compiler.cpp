@@ -301,7 +301,9 @@ void PagedCompiler::compile() {
                 runtime_.syncStream();
                 GraphRecordingGuard recording{runtime_};
                 auto output = model_->forward(input, forward_context_);
-                auto graph = recording.finish();
+                auto graph = runtime_.device().type() == infinilm::runtime::Device::Type::kAscend
+                                 ? recording.finish(input.total_sequence_lengths.value()->data(), b)
+                                 : recording.finish();
                 barrier_->wait();
 
                 return make_compiled_result(
@@ -490,6 +492,16 @@ PagedCompiler::Compiled PagedCompiler::get_compiled(const InfinilmModel::Input &
         return {nullptr, nullptr};
     }
 
+    auto graph = std::get<0>(selected_result->compiled);
+    if (graph && runtime_.device().type() == infinilm::runtime::Device::Type::kAscend) {
+        if (!is_cpu_contiguous_tensor(input.total_sequence_lengths,
+                                      infinilm::runtime::DataType::kInt32, {batch_size})) {
+            return {nullptr, nullptr};
+        }
+        graph->update_sequence_lengths(
+            reinterpret_cast<const int32_t *>(input.total_sequence_lengths.value()->data()), batch_size);
+    }
+
     graph_input.input_ids.value()->copy_from(runtime_, input.input_ids.value());
     graph_input.position_ids.value()->copy_from(runtime_, input.position_ids.value());
     graph_input.total_sequence_lengths.value()->copy_from(runtime_, input.total_sequence_lengths.value());
@@ -516,7 +528,6 @@ PagedCompiler::Compiled PagedCompiler::get_compiled(const InfinilmModel::Input &
     }
     graph_input.slot_mapping.value()->copy_from(runtime_, input.slot_mapping.value());
 
-    auto graph = std::get<0>(selected_result->compiled);
     const auto &compiled_output = std::get<1>(selected_result->compiled);
     auto shared_output = resume_output(*compiled_output);
 

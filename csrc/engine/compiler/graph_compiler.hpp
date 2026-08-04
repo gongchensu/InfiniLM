@@ -39,9 +39,9 @@ public:
     GraphRecordingGuard(GraphRecordingGuard &&) = delete;
     GraphRecordingGuard &operator=(GraphRecordingGuard &&) = delete;
 
-    std::shared_ptr<infinilm::execution::graph::Graph> finish() {
+    std::shared_ptr<infinilm::execution::graph::Graph> finish(const void *lengths_input = nullptr, size_t batch = 0) {
         try {
-            auto graph = runtime_.stopGraphRecording();
+            auto graph = runtime_.stopGraphRecording(lengths_input, batch);
             active_ = false;
             return graph;
         } catch (...) {

@@ -104,6 +104,7 @@ GraphTensor::GraphTensor(::infinilm::runtime::Runtime &runtime, const ::infinilm
 
 #ifdef USE_INFINIRT_GRAPH
 struct Graph::DeviceGraph {
+    infini::ops::GraphCaptureHandle::Updates updates;
     rt_runtime::Graph graph = nullptr;
     rt_runtime::GraphExec exec = nullptr;
     rt_runtime::Stream stream = nullptr;
@@ -153,6 +154,9 @@ Graph::Segment::~Segment() noexcept = default;
 void Graph::Segment::run() const {
 #ifdef USE_INFINIRT_GRAPH
     if (device_graph_ != nullptr && device_graph_->exec != nullptr) {
+        for (const auto &update : device_graph_->updates) {
+            update();
+        }
         device_graph_->launch();
         return;
     }
@@ -203,6 +207,14 @@ void Graph::run() const {
         // destruction drains its owner stream before releasing resources.
         throw;
     }
+}
+
+void Graph::update_sequence_lengths(const int32_t *values, size_t count) {
+    runtime_lease_->assertOwnerThread();
+    if (!values || count != sequence_lengths_.size()) {
+        throw std::invalid_argument("Invalid graph replay sequence lengths.");
+    }
+    std::copy_n(values, count, sequence_lengths_.begin());
 }
 
 Graph::ExecutionReport Graph::execution_report() const {
@@ -304,8 +316,15 @@ void Graph::instantiate() {
                                      + std::to_string(static_cast<int>(begin_status)) + ")");
         }
 
-        // Running the segment records only capture-safe operators.
-        segment->run();
+        if (lengths_input_ != nullptr) {
+            for (const auto &op : segment->ops) {
+                infini::ops::GraphCaptureHandle handle(
+                    lengths_input_, sequence_lengths_, segment->device_graph_->updates);
+                op->capture(handle);
+            }
+        } else {
+            segment->run();
+        }
 
         auto end_status = capture_guard.end(&segment->device_graph_->graph);
         if (end_status != rt_runtime::kSuccess) {

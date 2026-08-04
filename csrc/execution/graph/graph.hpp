@@ -1,5 +1,6 @@
 #pragma once
 
+#include <graph_capture_handle.h>
 #include <functional>
 #include <memory>
 #include <string>
@@ -33,11 +34,19 @@ public:
     explicit RecordedCall(std::function<void()> call,
                           bool device_graph_capture_safe,
                           bool explicit_host_replay = true)
+        : RecordedCall([fn = std::move(call)](infini::ops::Handle &) { fn(); },
+                       device_graph_capture_safe, explicit_host_replay) {}
+    RecordedCall(std::function<void(infini::ops::Handle &)> call,
+                 bool device_graph_capture_safe, bool explicit_host_replay)
         : call_(std::move(call)),
           device_graph_capture_safe_(device_graph_capture_safe),
           explicit_host_replay_(explicit_host_replay) {}
 
-    void run() const { call_(); }
+    void run() const {
+        infini::ops::Handle handle;
+        call_(handle);
+    }
+    void capture(infini::ops::GraphCaptureHandle &handle) const { call_(handle); }
     bool is_device_graph_capture_safe() const {
         return device_graph_capture_safe_;
     }
@@ -46,7 +55,7 @@ public:
     }
 
 private:
-    std::function<void()> call_;
+    std::function<void(infini::ops::Handle &)> call_;
     bool device_graph_capture_safe_;
     bool explicit_host_replay_;
 };
@@ -71,6 +80,7 @@ public:
 
     void run() const;
     ExecutionReport execution_report() const;
+    void update_sequence_lengths(const int32_t *values, size_t count);
 
 protected:
     void add_operator(std::shared_ptr<RecordedCall> op);
@@ -84,6 +94,8 @@ private:
     mutable bool replay_failed_ = false; // Partial replay cannot be safely retried.
     std::thread::id owner_thread_;
     ExecutionReport execution_report_;
+    const void *lengths_input_ = nullptr;
+    std::vector<int64_t> sequence_lengths_;
     void retain_runtime(std::shared_ptr<::infinilm::runtime::Runtime> runtime,
                         std::shared_ptr<void> allocation_lease);
 
