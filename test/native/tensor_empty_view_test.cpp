@@ -29,18 +29,18 @@ void run() {
     std::weak_ptr<std::vector<float>> weak_owner = owner;
     auto base = Tensor::from_blob(owner->data(), {8}, DataType::kFloat32, cpu, owner);
     auto *end = reinterpret_cast<std::byte *>(owner->data() + 8);
-    auto empty = base->narrow({{0, 8, 0}});
-    auto flat = empty->view({0});
-    auto multi = empty->view({2, 0, 3, 0});
-    require(flat->data() == end && multi->data() == end);
-    require(flat->strides() == Strides{1});
-    require(multi->strides() == Strides({3, 3, 1, 1}));
-    require(multi->numel() == 0 && multi->nbytes() == 0);
-    expect_error<std::invalid_argument>([&] { (void)empty->view({}); });
-    expect_error<std::invalid_argument>([&] { (void)empty->view({1}); });
+    auto empty = base.narrow({{0, 8, 0}});
+    auto flat = empty.reshape({0});
+    auto multi = empty.reshape({2, 0, 3, 0});
+    require(flat.data() == end && multi.data() == end);
+    require(flat.strides() == Strides{1});
+    require(multi.strides() == Strides({3, 3, 1, 1}));
+    require(multi.numel() == 0 && multi.nbytes() == 0);
+    expect_error<std::invalid_argument>([&] { (void)empty.reshape({}); });
+    expect_error<std::invalid_argument>([&] { (void)empty.reshape({1}); });
     const auto max_size = std::numeric_limits<Size>::max();
-    expect_error<std::length_error>([&] { (void)empty->view({max_size, 2}); });
-    expect_error<std::length_error>([&] { (void)empty->view({0, max_size}); });
+    expect_error<std::length_error>([&] { (void)empty.reshape({max_size, 2}); });
+    expect_error<std::length_error>([&] { (void)empty.reshape({0, max_size}); });
     owner.reset();
     base.reset();
     empty.reset();
@@ -51,30 +51,30 @@ void run() {
 
     // Preserve custom strides when the empty shape is unchanged.
     auto custom = Tensor::strided_from_blob(nullptr, {0, 3}, {9, 2}, DataType::kFloat32, cpu);
-    require(custom->view({0, 3})->strides() == Strides({9, 2}));
-    require(custom->view({0})->numel() == 0);
+    require(custom.reshape({0, 3}).strides() == Strides({9, 2}));
+    require(custom.reshape({0}).numel() == 0);
 
     float value = 31.0F;
     auto scalar = Tensor::from_blob(&value, {}, DataType::kFloat32, cpu);
-    auto singleton = scalar->view({1, 1});
-    require(singleton->strides() == Strides({1, 1}));
-    require(singleton->data() == reinterpret_cast<std::byte *>(&value));
-    require(singleton->view({})->shape().empty());
-    require(scalar->view({})->strides().empty());
-    expect_error<std::invalid_argument>([&] { (void)scalar->view({0}); });
-    expect_error<std::invalid_argument>([&] { (void)scalar->view({2}); });
+    auto singleton = scalar.reshape({1, 1});
+    require(singleton.strides() == Strides({1, 1}));
+    require(singleton.data() == reinterpret_cast<std::byte *>(&value));
+    require(singleton.reshape({}).shape().empty());
+    require(scalar.reshape({}).strides().empty());
+    expect_error<std::invalid_argument>([&] { (void)scalar.reshape({0}); });
+    expect_error<std::invalid_argument>([&] { (void)scalar.reshape({2}); });
 
     std::vector<float> values(12);
     auto ordinary = Tensor::from_blob(values.data(), {3, 4}, DataType::kFloat32, cpu);
-    auto reshaped = ordinary->view({2, 6});
-    require(reshaped->strides() == Strides({6, 1}));
-    require(reshaped->data() == ordinary->data());
-    auto offset = ordinary->narrow({{0, 1, 2}})->view({8});
-    require(offset->data() == reinterpret_cast<std::byte *>(values.data() + 4));
-    expect_error<std::invalid_argument>([&] { (void)ordinary->view({11}); });
-    expect_error<std::length_error>([&] { (void)ordinary->view({max_size, max_size}); });
-    auto transposed = ordinary->permute({1, 0});
-    expect_error<std::runtime_error>([&] { (void)transposed->view({12}); });
+    auto reshaped = ordinary.reshape({2, 6});
+    require(reshaped.strides() == Strides({6, 1}));
+    require(reshaped.data() == ordinary.data());
+    auto offset = ordinary.narrow({{0, 1, 2}}).reshape({8});
+    require(offset.data() == reinterpret_cast<std::byte *>(values.data() + 4));
+    expect_error<std::invalid_argument>([&] { (void)ordinary.reshape({11}); });
+    expect_error<std::length_error>([&] { (void)ordinary.reshape({max_size, max_size}); });
+    auto transposed = ordinary.permute({1, 0});
+    expect_error<std::runtime_error>([&] { (void)transposed.reshape({12}); });
 }
 } // namespace
 

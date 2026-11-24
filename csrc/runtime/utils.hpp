@@ -41,12 +41,12 @@ inline struct SpdlogInitializer {
 
 #define INFINILM_ASSERT_TENSORS_SAME_DEVICE(FIRST___, ...)                        \
     do {                                                                          \
-        const auto &first_device___ = (FIRST___)->device();                       \
+        const auto &first_device___ = (FIRST___).device();                        \
         for (const auto &tensor___ : {__VA_ARGS__}) {                             \
-            if (first_device___ != (tensor___)->device()) {                       \
+            if (first_device___ != (tensor___).device()) {                        \
                 throw std::runtime_error("Tensor devices mismatch "               \
                                          + first_device___.ToString() + " vs "    \
-                                         + (tensor___)->device().ToString()       \
+                                         + (tensor___).device().ToString()        \
                                          + " from " + std::string(__func__)       \
                                          + " at " + std::string(__FILE__)         \
                                          + ":" + std::to_string(__LINE__) + "."); \

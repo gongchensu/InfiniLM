@@ -87,13 +87,13 @@ private:
  * ========================= */
 
 GraphTensor::GraphTensor(::infinilm::runtime::Runtime &runtime, const ::infinilm::runtime::Tensor &tensor)
-    : ::infinilm::runtime::Tensor(runtime.isGraphRecording() ? tensor->to_blob_(runtime) : tensor) {
+    : ::infinilm::runtime::Tensor(runtime.isGraphRecording() ? tensor.to_blob_(runtime) : tensor) {
     runtime.assertOwnerThread();
 }
 
 GraphTensor::GraphTensor(::infinilm::runtime::Runtime &runtime, const ::infinilm::runtime::Tensor &tensor, SnapshotPolicy policy)
     : ::infinilm::runtime::Tensor(policy == SnapshotPolicy::kBlob || runtime.isGraphRecording()
-                                      ? tensor->to_blob_(runtime)
+                                      ? tensor.to_blob_(runtime)
                                       : tensor) {
     runtime.assertOwnerThread();
 }

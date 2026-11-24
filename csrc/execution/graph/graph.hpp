@@ -117,13 +117,13 @@ private:
         auto __op_type = ::infinilm::execution::trace::opTypeFromName(#__OP_NAME__); \
         auto &&__trace_tensor = (__TRACE_TENSOR__);                                  \
         if (__trace_tensor) {                                                        \
-            const auto &__trace_shape = __trace_tensor->shape();                     \
-            const auto __trace_device = __trace_tensor->device();                    \
+            const auto &__trace_shape = __trace_tensor.shape();                      \
+            const auto __trace_device = __trace_tensor.device();                     \
             ::infinilm::execution::trace::traceOp(                                   \
                 __op_type,                                                           \
                 __trace_shape.data(),                                                \
                 __trace_shape.size(),                                                \
-                static_cast<uint8_t>(__trace_tensor->dtype()),                       \
+                static_cast<uint8_t>(__trace_tensor.dtype()),                        \
                 static_cast<uint8_t>(__trace_device.type()),                         \
                 static_cast<int8_t>(__trace_device.index()));                        \
         } else {                                                                     \

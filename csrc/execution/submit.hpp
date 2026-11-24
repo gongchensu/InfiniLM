@@ -52,7 +52,7 @@ template <class T>
 void check_owner(infinilm::runtime::Runtime &, const T &);
 
 inline void check_owner(infinilm::runtime::Runtime &runtime, const infinilm::runtime::Tensor &tensor) {
-    if (!tensor || tensor->device() != runtime.device()) {
+    if (!tensor || tensor.device() != runtime.device()) {
         throw std::invalid_argument("Ops submission requires tensors on the owning Runtime device");
     }
 }
@@ -76,9 +76,9 @@ void check_owner(infinilm::runtime::Runtime &runtime, const T &value) {
 }
 
 inline auto view(const infinilm::runtime::Tensor &tensor) {
-    return infini::ops::Tensor(const_cast<std::byte *>(tensor->data()),
-                               tensor->shape(), tensor->dtype(), tensor->device(),
-                               tensor->strides());
+    return infini::ops::Tensor(const_cast<std::byte *>(tensor.data()),
+                               tensor.shape(), tensor.dtype(), tensor.device(),
+                               tensor.strides());
 }
 inline auto view(const infinilm::execution::graph::GraphTensor &tensor) {
     return view(static_cast<const infinilm::runtime::Tensor &>(tensor));

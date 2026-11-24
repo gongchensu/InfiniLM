@@ -42,6 +42,9 @@ struct TensorSliceParams {
 
 class Tensor {
 public:
+    using Size = std::size_t;
+    using Stride = std::ptrdiff_t;
+
     static Tensor empty(Runtime &runtime, const Shape &shape, const DataType &dtype,
                         bool pin_memory = false);
 
@@ -116,6 +119,44 @@ public:
     const TensorImpl *operator->() const;
 
     operator bool() const;
+
+    // RT-compatible value-object accessors. LM call sites should migrate to
+    // these before `infinilm::runtime::Tensor` becomes an alias of RT Tensor.
+    std::byte *data();
+    const std::byte *data() const;
+    const Shape &shape() const;
+    const Strides &strides() const;
+    bool is_contiguous() const;
+    Size ndim() const;
+    Size numel() const;
+    Size size(size_t dim) const;
+    size_t element_size() const;
+    size_t nbytes() const;
+    Stride stride(size_t dim) const;
+    DataType dtype() const;
+    Device device() const;
+    infini::rt::TensorView view();
+    infini::rt::TensorView view() const;
+    bool is_pinned() const;
+    std::shared_ptr<Runtime> allocation_owner() const;
+    std::string info() const;
+    Tensor to_blob_(Runtime &runtime) const;
+    Tensor resume_from_blob_(Runtime &runtime) const;
+    Tensor to(Device device) const;
+    Tensor to(Runtime &runtime, Device device) const;
+    Tensor to(Runtime &source_runtime, Runtime &destination_runtime) const;
+    void copy_from(Tensor src);
+    void copy_from(Runtime &runtime, Tensor src);
+    void copy_from(Runtime &destination_runtime, Runtime &source_runtime, Tensor src);
+    Tensor contiguous() const;
+    Tensor contiguous(Runtime &runtime) const;
+    Tensor squeeze(size_t dim) const;
+    Tensor unsqueeze(size_t dim) const;
+    Tensor narrow(const std::vector<TensorSliceParams> &slices) const;
+    Tensor permute(const Shape &order) const;
+    Tensor reshape(const Shape &new_shape) const;
+    Tensor view(const Shape &new_shape) const;
+    Tensor as_strided(const Shape &new_shape, const Strides &new_strides) const;
 
 protected:
     Tensor(std::shared_ptr<TensorImpl> impl) : impl_(std::move(impl)) {}
@@ -324,5 +365,59 @@ private:
     // Mark to indicate if the tensor is created from to_blob_()
     bool to_blob_mark_ = false;
 };
+
+inline std::byte *Tensor::data() { return impl_->data(); }
+inline const std::byte *Tensor::data() const { return impl_->data(); }
+inline const Shape &Tensor::shape() const { return impl_->shape(); }
+inline const Strides &Tensor::strides() const { return impl_->strides(); }
+inline bool Tensor::is_contiguous() const { return impl_->is_contiguous(); }
+inline Tensor::Size Tensor::ndim() const { return impl_->ndim(); }
+inline Tensor::Size Tensor::numel() const { return impl_->numel(); }
+inline Tensor::Size Tensor::size(size_t dim) const { return impl_->size(dim); }
+inline size_t Tensor::element_size() const { return impl_->element_size(); }
+inline size_t Tensor::nbytes() const { return impl_->nbytes(); }
+inline Tensor::Stride Tensor::stride(size_t dim) const { return impl_->stride(dim); }
+inline DataType Tensor::dtype() const { return impl_->dtype(); }
+inline Device Tensor::device() const { return impl_->device(); }
+inline infini::rt::TensorView Tensor::view() { return impl_->view(); }
+inline infini::rt::TensorView Tensor::view() const {
+    return const_cast<Tensor *>(this)->impl_->view();
+}
+inline bool Tensor::is_pinned() const { return impl_->is_pinned(); }
+inline std::shared_ptr<Runtime> Tensor::allocation_owner() const {
+    return allocationOwner(impl_->data_.memory);
+}
+inline std::string Tensor::info() const { return impl_->info(); }
+inline Tensor Tensor::to_blob_(Runtime &runtime) const { return impl_->to_blob_(runtime); }
+inline Tensor Tensor::resume_from_blob_(Runtime &runtime) const {
+    return impl_->resume_from_blob_(runtime);
+}
+inline Tensor Tensor::to(Device device) const { return impl_->to(device); }
+inline Tensor Tensor::to(Runtime &runtime, Device device) const {
+    return impl_->to(runtime, device);
+}
+inline Tensor Tensor::to(Runtime &source_runtime, Runtime &destination_runtime) const {
+    return impl_->to(source_runtime, destination_runtime);
+}
+inline void Tensor::copy_from(Tensor src) { impl_->copy_from(std::move(src)); }
+inline void Tensor::copy_from(Runtime &runtime, Tensor src) {
+    impl_->copy_from(runtime, std::move(src));
+}
+inline void Tensor::copy_from(Runtime &destination_runtime, Runtime &source_runtime, Tensor src) {
+    impl_->copy_from(destination_runtime, source_runtime, std::move(src));
+}
+inline Tensor Tensor::contiguous() const { return impl_->contiguous(); }
+inline Tensor Tensor::contiguous(Runtime &runtime) const { return impl_->contiguous(runtime); }
+inline Tensor Tensor::squeeze(size_t dim) const { return impl_->squeeze(dim); }
+inline Tensor Tensor::unsqueeze(size_t dim) const { return impl_->unsqueeze(dim); }
+inline Tensor Tensor::narrow(const std::vector<TensorSliceParams> &slices) const {
+    return impl_->narrow(slices);
+}
+inline Tensor Tensor::permute(const Shape &order) const { return impl_->permute(order); }
+inline Tensor Tensor::reshape(const Shape &new_shape) const { return impl_->view(new_shape); }
+inline Tensor Tensor::view(const Shape &new_shape) const { return impl_->view(new_shape); }
+inline Tensor Tensor::as_strided(const Shape &new_shape, const Strides &new_strides) const {
+    return impl_->as_strided(new_shape, new_strides);
+}
 
 } // namespace infinilm::runtime

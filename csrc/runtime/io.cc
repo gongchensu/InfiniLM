@@ -30,12 +30,12 @@ using Size = infinilm::runtime::Size;
  * @brief This function extracts a scalar or sub-tensor from a tensor using a vector of indexes.
  */
 inline Tensor at_impl(const Tensor &tensor, const std::vector<Size> &indexes) {
-    if (indexes.size() > tensor->ndim()) {
-        throw std::runtime_error("at_impl:: Number of indexes (" + std::to_string(indexes.size()) + ") exceeds tensor dimensions (" + std::to_string(tensor->ndim()) + ")");
+    if (indexes.size() > tensor.ndim()) {
+        throw std::runtime_error("at_impl:: Number of indexes (" + std::to_string(indexes.size()) + ") exceeds tensor dimensions (" + std::to_string(tensor.ndim()) + ")");
     }
 
     for (size_t i = 0; i < indexes.size(); i++) {
-        if (indexes[i] >= tensor->shape()[i]) {
+        if (indexes[i] >= tensor.shape()[i]) {
             throw std::runtime_error("at_impl :: Index " + std::to_string(indexes[i]) + " is out of bounds for dimension " + std::to_string(i));
         }
     }
@@ -46,9 +46,9 @@ inline Tensor at_impl(const Tensor &tensor, const std::vector<Size> &indexes) {
         slices.push_back({i, indexes[i], 1});
     }
 
-    Tensor result = tensor->narrow(slices);
+    Tensor result = tensor.narrow(slices);
     for (size_t i = 0; i < indexes.size(); i++) {
-        result = result->squeeze(0);
+        result = result.squeeze(0);
     }
 
     return result;
@@ -103,16 +103,16 @@ T item_impl(const std::byte *data, DataType dtype) {
  */
 template <typename T>
 T item(const Tensor &tensor) {
-    if (tensor->numel() != 1) {
-        throw std::runtime_error("item() can only be called on a tensor with exactly one element, but got " + std::to_string(tensor->numel()) + " elements");
+    if (tensor.numel() != 1) {
+        throw std::runtime_error("item() can only be called on a tensor with exactly one element, but got " + std::to_string(tensor.numel()) + " elements");
     }
 
-    if (tensor->device().type() != Device::Type::kCpu) {
-        throw std::runtime_error("item() can only be called on a CPU tensor, but got device: " + tensor->device().ToString());
+    if (tensor.device().type() != Device::Type::kCpu) {
+        throw std::runtime_error("item() can only be called on a CPU tensor, but got device: " + tensor.device().ToString());
     }
 
-    const std::byte *data = tensor->data();
-    DataType dtype = tensor->dtype();
+    const std::byte *data = tensor.data();
+    DataType dtype = tensor.dtype();
     return item_impl<T>(data, dtype);
 }
 } // namespace
@@ -371,14 +371,14 @@ void recurser_run(Printer<T> &printer,
 
     using size_type = Size;
     const auto view = at(tensor, indexes);
-    if (view->ndim() == 0) {
+    if (view.ndim() == 0) {
         T value = item<T>(view);
         printer.update(value);
     } else {
         size_type i = 0;
-        for (; i != static_cast<size_type>(view->shape()[0] - 1); ++i) {
-            if (lim && size_type(view->shape()[0]) > (lim * 2) && i == lim) {
-                i = static_cast<size_type>(view->shape()[0]) - lim;
+        for (; i != static_cast<size_type>(view.shape()[0] - 1); ++i) {
+            if (lim && size_type(view.shape()[0]) > (lim * 2) && i == lim) {
+                i = static_cast<size_type>(view.shape()[0]) - lim;
                 if (lim <= 1) {
                     break;
                 }
@@ -408,7 +408,7 @@ std::ostream &xoutput(std::ostream &out,
 
     using size_type = Size;
     const auto view = at(tensor, indexes);
-    if (view->ndim() == 0) {
+    if (view.ndim() == 0) {
         printer.print_next(out);
     } else {
         std::string indents(blanks, ' ');
@@ -419,24 +419,24 @@ std::ostream &xoutput(std::ostream &out,
         const size_type line_lim = static_cast<size_type>(std::floor(line_width / ewp2));
 
         out << '[';
-        for (; i != size_type(view->shape()[0] - 1); ++i) {
+        for (; i != size_type(view.shape()[0] - 1); ++i) {
 
-            if (edge_items && size_type(view->shape()[0]) > (edge_items * 2) && i == edge_items) {
-                if (view->ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
+            if (edge_items && size_type(view.shape()[0]) > (edge_items * 2) && i == edge_items) {
+                if (view.ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
                     out << " ...,";
-                } else if (view->ndim() > 1) {
+                } else if (view.ndim() > 1) {
                     elems_on_line = 0;
                     out << "...," << std::endl
                         << indents;
                 } else {
                     out << "..., ";
                 }
-                i = size_type(view->shape()[0]) - edge_items;
+                i = size_type(view.shape()[0]) - edge_items;
                 if (edge_items <= 1) {
                     break;
                 }
             }
-            if (view->ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
+            if (view.ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
                 out << std::endl
                     << indents;
                 elems_on_line = 0;
@@ -449,14 +449,14 @@ std::ostream &xoutput(std::ostream &out,
             indexes.pop_back();
             elems_on_line++;
 
-            if ((view->ndim() == 1) && !(line_lim != 0 && elems_on_line >= line_lim)) {
+            if ((view.ndim() == 1) && !(line_lim != 0 && elems_on_line >= line_lim)) {
                 ; // out << ' ';
-            } else if (view->ndim() > 1) {
+            } else if (view.ndim() > 1) {
                 out << std::endl
                     << indents;
             }
         }
-        if (view->ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
+        if (view.ndim() == 1 && line_lim != 0 && elems_on_line >= line_lim) {
             out << std::endl
                 << indents;
         }
@@ -473,21 +473,21 @@ std::ostream &xoutput(std::ostream &out,
 template <class T>
 std::ostream &pretty_print(const Tensor &original_tensor,
                            std::ostream &out = std::cout) {
-    auto runtime = original_tensor->allocation_owner();
-    if (!runtime || runtime->device() != original_tensor->device()) {
-        runtime = context::resolveRuntime(original_tensor->device());
+    auto runtime = original_tensor.allocation_owner();
+    if (!runtime || runtime->device() != original_tensor.device()) {
+        runtime = context::resolveRuntime(original_tensor.device());
     }
     runtime->assertOwnerThread();
-    Tensor tensor = original_tensor->device().type() == Device::Type::kCpu
+    Tensor tensor = original_tensor.device().type() == Device::Type::kCpu
                       ? original_tensor
-                      : original_tensor->to(*runtime, Device::Type::kCpu);
-    bool on_cpu = original_tensor->device() == Device::Type::kCpu;
-    std::string device_str = original_tensor->device().ToString();
+                      : original_tensor.to(*runtime, Device::Type::kCpu);
+    bool on_cpu = original_tensor.device() == Device::Type::kCpu;
+    std::string device_str = original_tensor.device().ToString();
 
     fmtflags_guard<std::ostream> guard(out);
 
     std::size_t edge_items = 0;
-    Size sz = tensor->numel();
+    Size sz = tensor.numel();
     auto po = PrintOptionsImpl{};
 
     if (sz > static_cast<std::size_t>(po.threshold)) {
@@ -530,7 +530,7 @@ std::ostream &pretty_print(const Tensor &original_tensor,
         out << ", device=" << '\'' << device_str << '\'';
     }
 
-    out << ", dtype=infinicore." << toString(tensor->dtype()) << ")\n";
+    out << ", dtype=infinicore." << toString(tensor.dtype()) << ")\n";
     out.precision(temp_precision); // restore precision
     return out;
 }
@@ -545,7 +545,7 @@ std::ostream &operator<<(std::ostream &out, const Tensor &tensor) {
         return out;
     }
 
-    switch (tensor->dtype()) {
+    switch (tensor.dtype()) {
     case DataType::kInt8: // 3
     {
         return infinilm::runtime::print_options::pretty_print<int8_t>(tensor, out);
@@ -597,7 +597,7 @@ std::ostream &operator<<(std::ostream &out, const Tensor &tensor) {
         return infinilm::runtime::print_options::pretty_print<float>(tensor, out);
     }
     default:
-        throw std::runtime_error("cant not print unknown dtype tensor : " + toString(tensor->dtype()));
+        throw std::runtime_error("cant not print unknown dtype tensor : " + toString(tensor.dtype()));
     }
 
     return out;
