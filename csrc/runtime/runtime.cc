@@ -129,6 +129,10 @@ Device Runtime::device() const {
     return device_;
 }
 
+std::weak_ptr<void> Runtime::allocation_owner() const {
+    return std::const_pointer_cast<Runtime>(shared_from_this());
+}
+
 infini::rt::runtime::Stream Runtime::stream() const {
     return stream_;
 }
@@ -219,7 +223,7 @@ void Runtime::releaseDeviceMemory(std::byte *ptr) noexcept {
     }
 }
 
-std::shared_ptr<Memory> Runtime::allocateMemory(size_t size) {
+std::shared_ptr<Memory> Runtime::allocate(size_t size) {
     infini::rt::DeviceGuard device_guard{device_.type(), device_.index(), true};
     auto runtime = shared_from_this();
     std::byte *data_ptr = runtime->device_memory_allocator_->allocate(size);
@@ -234,7 +238,7 @@ std::shared_ptr<Memory> Runtime::allocateMemory(size_t size) {
     }
 }
 
-std::shared_ptr<Memory> Runtime::allocateParameterMemory(size_t size) {
+std::shared_ptr<Memory> Runtime::allocate_exact(size_t size) {
     infini::rt::DeviceGuard device_guard{device_.type(), device_.index(), true};
     auto runtime = shared_from_this();
     std::byte *data_ptr = runtime->device_memory_allocator_->allocate_exact(size);
@@ -249,11 +253,11 @@ std::shared_ptr<Memory> Runtime::allocateParameterMemory(size_t size) {
     }
 }
 
-std::shared_ptr<Memory> Runtime::allocatePinnedHostMemory(size_t size) {
+std::shared_ptr<Memory> Runtime::allocate_pinned_host(size_t size) {
     infini::rt::DeviceGuard device_guard{device_.type(), device_.index(), true};
     if (device_.type() == Device::Type::kCpu) {
         spdlog::warn("For CPU devices, pinned memory is not supported, falling back to regular host memory");
-        return allocateMemory(size);
+        return allocate(size);
     }
     auto runtime = shared_from_this();
     void *data_ptr = nullptr;

@@ -35,7 +35,7 @@ public:
         if (!bytes) {
             return {};
         }
-        auto memory = runtime_.allocateMemory(bytes);
+        auto memory = runtime_.allocate(bytes);
         return {std::shared_ptr<void>(memory, memory->data()), memory->size()};
     }
 
@@ -163,7 +163,7 @@ void submit(infinilm::runtime::Runtime &runtime, RecordingPolicy policy,
     auto instance = std::shared_ptr<infini::ops::Operator<OpsKey>>{
         std::apply([&](const auto &...values) { return OpsKey::Make(config, values...); }, views)};
     const auto bytes = instance->workspace_size_in_bytes();
-    auto workspace = bytes ? runtime.allocateMemory(bytes) : std::shared_ptr<infinilm::runtime::Memory>{};
+    auto workspace = bytes ? runtime.allocate(bytes) : std::shared_ptr<infinilm::runtime::Memory>{};
     auto recorded = std::make_tuple(detail::snapshot(runtime, args)...);
     const bool capture_safe = policy != RecordingPolicy::HostOnly && instance->capture_safe();
     runtime.addGraphOperator(std::make_shared<infinilm::execution::graph::RecordedCall>(

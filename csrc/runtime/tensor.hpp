@@ -158,7 +158,7 @@ public:
     infini::rt::TensorView view();
 
     bool is_pinned() const;
-    std::shared_ptr<Runtime> allocation_owner() const { return data_.memory->allocation_owner(); }
+    std::shared_ptr<Runtime> allocation_owner() const { return allocationOwner(data_.memory); }
 
     std::string info() const;
 

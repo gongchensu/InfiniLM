@@ -1,43 +1,26 @@
 #pragma once
 
-#include "device.hpp"
-
 #include <cstddef>
-#include <functional>
 #include <memory>
 
+#include <infini/rt/memory.h>
+
+#include "runtime/device.hpp"
+
 namespace infinilm::runtime {
+
 class Runtime;
 
-class Memory {
-public:
-    using Deleter = std::function<void(std::byte *)>;
+using Memory = infini::rt::Memory;
 
-    Memory(std::byte *data,
-           size_t size,
-           Device device,
-           Deleter deleter,
-           bool pin_memory = false,
-           bool graph_pinnable = false,
-           std::weak_ptr<Runtime> allocation_owner = {});
-    ~Memory();
-
-    std::byte *data();
-    Device device() const;
-    size_t size() const;
-    bool is_pinned() const;
-    bool is_graph_pinnable() const;
-    // Allocation identity only, not a last-writer or producer-stream tracker.
-    std::shared_ptr<Runtime> allocation_owner() const { return allocation_owner_.lock(); }
-
-private:
-    std::byte *data_;
-    size_t size_;
-    Device device_;
-    Deleter deleter_;
-    bool is_pinned_;
-    bool graph_pinnable_;
-    std::weak_ptr<Runtime> allocation_owner_;
-};
+// RT stores allocation identity as an opaque owner token. LM created that
+// token from shared_ptr<Runtime>, so this boundary can restore the typed owner.
+inline std::shared_ptr<Runtime> allocationOwner(
+    const std::shared_ptr<Memory> &memory) {
+    if (!memory) {
+        return nullptr;
+    }
+    return std::static_pointer_cast<Runtime>(memory->allocation_owner());
+}
 
 } // namespace infinilm::runtime

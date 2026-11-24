@@ -1,6 +1,7 @@
 #pragma once
 
 #include <infini/rt/reusable_memory_pool.h>
+#include <infini/rt/tensor_allocator.h>
 
 #include "runtime/context.hpp"
 
@@ -10,7 +11,8 @@
 #include <infini/rt.h>
 
 namespace infinilm::runtime {
-class Runtime : public std::enable_shared_from_this<Runtime> {
+class Runtime : public std::enable_shared_from_this<Runtime>,
+                public infini::rt::TensorAllocator {
 private:
     Device device_;
     bool owner_drain_fail_stop_{false};
@@ -38,7 +40,8 @@ public:
     // Read only after assertOwnerThread(); not a cross-thread/provider capability.
     bool ownerDrainFailStopEnabled() const noexcept { return owner_drain_fail_stop_; }
 
-    Device device() const;
+    Device device() const override;
+    std::weak_ptr<void> allocation_owner() const override;
     infini::rt::runtime::Stream stream() const;
 
     void syncStream();
@@ -49,10 +52,10 @@ public:
     // live capture. Excludes driver-internal CUDA Graph allocations.
     size_t graphPinnedMemoryBytes();
 
-    std::shared_ptr<Memory> allocateMemory(size_t size);
+    std::shared_ptr<Memory> allocate(size_t size) override;
     // Initial physical Parameter storage, tracked by the same owner/graph allocator.
-    std::shared_ptr<Memory> allocateParameterMemory(size_t size);
-    std::shared_ptr<Memory> allocatePinnedHostMemory(size_t size);
+    std::shared_ptr<Memory> allocate_exact(size_t size) override;
+    std::shared_ptr<Memory> allocate_pinned_host(size_t size) override;
     std::shared_ptr<Memory> reinstantiateBlob(std::shared_ptr<Memory> blob);
     bool retainGraphMemory(const std::shared_ptr<Memory> &memory);
 

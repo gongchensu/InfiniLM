@@ -27,7 +27,7 @@ inline infinilm::runtime::Strides calculate_contiguous_strides(const infinilm::r
 
 std::shared_ptr<infinilm::runtime::Memory> allocate_tensor_storage(
     infinilm::runtime::Runtime &runtime, size_t bytes, bool pinned) {
-    return pinned ? runtime.allocatePinnedHostMemory(bytes) : runtime.allocateMemory(bytes);
+    return pinned ? runtime.allocate_pinned_host(bytes) : runtime.allocate(bytes);
 }
 
 size_t parameter_storage_bytes(const infinilm::runtime::Shape &shape,
@@ -84,7 +84,7 @@ Tensor Tensor::empty_parameter(Runtime &runtime,
     }
     auto t = std::shared_ptr<TensorImpl>(new TensorImpl(shape, dtype));
     t->data_.offset = 0;
-    t->data_.memory = runtime.allocateParameterMemory(bytes);
+    t->data_.memory = runtime.allocate_exact(bytes);
     return Tensor{t};
 }
 
