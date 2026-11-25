@@ -174,7 +174,19 @@ void PagedCompiler::compile() {
         short_block_tables_holder_.reset();
 
         const size_t nblocks = paged_config->num_blocks();
+        const auto &model_config = model_->get_model_config();
         size_t graph_blocks_per_request = nblocks;
+        if (runtime_.device().type() == infinilm::runtime::Device::Type::kNvidia
+            && graph_config_.attention_backend == backends::AttentionBackend::FLASH_ATTN
+            && model_config) {
+            const size_t max_position = model_config->get_or<size_t>("max_position_embeddings", 0);
+            if (max_position > 0) {
+                // FlashAttention uses the captured width to partition split-KV work.
+                // Bound one request by the model context instead of the shared KV pool.
+                graph_blocks_per_request = std::min(
+                    nblocks, 1 + (max_position - 1) / paged_config->block_size());
+            }
+        }
         if (const char *configured = std::getenv("INFINILM_GRAPH_MAX_BLOCKS_PER_REQUEST")) {
             size_t consumed = 0;
             const size_t value = std::stoul(configured, &consumed);
@@ -186,7 +198,6 @@ void PagedCompiler::compile() {
         auto &forward_context = forward_context_;
         const bool has_mamba_state = has_mamba_cache(forward_context);
 
-        const auto &model_config = model_->get_model_config();
         if (decode_batch_sizes_.empty()) {
             return;
         }
