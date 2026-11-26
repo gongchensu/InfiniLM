@@ -91,6 +91,38 @@ def blocks_held(s):
 
 
 class ChunkedPrefillSchedTest(unittest.TestCase):
+    def test_mixed_prefill_resumes_before_waiting_requests(self):
+        s = make_scheduler(
+            enable_mixed_batching=True,
+            prioritize_prefill_resume=True,
+            chunked_prefill_size=64,
+            max_num_batched_tokens=64,
+        )
+        first = make_request("first", 192, max_tokens=1)
+        second = make_request("second", 16, max_tokens=1)
+        s.add_request(first)
+        s.add_request(second)
+
+        self.assertIs(schedule_one_chunk(s), first)
+        self.assertIs(schedule_one_chunk(s), first)
+        phases = []
+        self.assertTrue(run_scheduler(s, [first, second], phases=phases))
+        self.assertEqual(phases, ["P:first", "P:second"])
+        self.assertEqual(blocks_held(s), 0)
+
+    def test_mixed_prefill_by_default_yields_to_waiting_requests(self):
+        s = make_scheduler(
+            enable_mixed_batching=True,
+            chunked_prefill_size=64,
+            max_num_batched_tokens=64,
+        )
+        first = make_request("first", 192, max_tokens=1)
+        second = make_request("second", 192, max_tokens=1)
+        s.add_request(first)
+        s.add_request(second)
+        self.assertIs(schedule_one_chunk(s), first)
+        self.assertIs(schedule_one_chunk(s), second)
+
     def test_mixed_decode_and_resumed_prefill_share_budget(self):
         from infinilm.processors.basic_llm_processor import BasicLLMProcessor
 
@@ -465,14 +497,20 @@ class ChunkedPrefillDeadlockTest(unittest.TestCase):
         # A holds 4 blocks pending and needs ceil((144+16)/16)-4
         # = 6 more; B needs ceil((112+16)/16) = 8. 4+6+8 = 18 > 12,
         # so B must be deferred until A completes.
-        s = make_scheduler(**self.REPRO)
-        a, b = make_request("a", 144, 16), make_request("b", 112, 16)
-        s.add_request(a)
-        ra = schedule_one_chunk(s)
-        self.assertEqual(len(ra.block_table), 4)
-        s.add_request(b)
-        self.assertFalse(s.can_accept_request(b, 0))
-        self.assertTrue(run_scheduler(s, [a, b]))
+        for mixed, resume in ((False, False), (True, False), (True, True)):
+            with self.subTest(mixed=mixed, resume=resume):
+                s = make_scheduler(
+                    **self.REPRO,
+                    enable_mixed_batching=mixed,
+                    prioritize_prefill_resume=resume,
+                )
+                a, b = make_request("a", 144, 16), make_request("b", 112, 16)
+                s.add_request(a)
+                ra = schedule_one_chunk(s)
+                self.assertEqual(len(ra.block_table), 4)
+                s.add_request(b)
+                self.assertFalse(s.can_accept_request(b, 0))
+                self.assertTrue(run_scheduler(s, [a, b]))
 
     def test_admission_boundary_exact_fit_allowed(self):
         # Same shape on an 18-block cache: 4+6+8=18 fits

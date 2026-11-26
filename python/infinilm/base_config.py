@@ -80,6 +80,7 @@ class BaseConfig:
         self.num_blocks = self.args.num_blocks
         self.chunked_prefill_size = self.args.chunked_prefill_size
         self.enable_mixed_batching = self.args.enable_mixed_batching
+        self.prioritize_prefill_resume = self.args.prioritize_prefill_resume
         self.block_size = self.args.block_size
         self.max_cache_len = self.args.max_cache_len
         self.kv_cache_dtype = self.args.kv_cache_dtype
@@ -250,6 +251,12 @@ class BaseConfig:
         )
         self.parser.add_argument(
             "--num-blocks", type=int, default=512, help="number of KV cache blocks"
+        )
+        self.parser.add_argument(
+            "--prioritize-prefill-resume",
+            action="store_true",
+            help="with mixed batching, resume chunked prefills before new requests "
+            "(default: return unfinished prefills to the waiting queue tail)",
         )
         self.parser.add_argument(
             "--enable-mixed-batching",

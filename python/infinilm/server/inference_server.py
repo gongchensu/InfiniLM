@@ -151,6 +151,7 @@ class InferenceServer:
         tool_call_parser: str = "none",
         chunked_prefill_size: int = 0,
         enable_mixed_batching: bool = False,
+        prioritize_prefill_resume: bool = False,
     ):
         """Initialize inference server.
 
@@ -217,6 +218,7 @@ class InferenceServer:
         self.tool_call_parser = tool_call_parser
         self.chunked_prefill_size = chunked_prefill_size
         self.enable_mixed_batching = enable_mixed_batching
+        self.prioritize_prefill_resume = prioritize_prefill_resume
 
         self.engine: AsyncLLMEngine = None
 
@@ -262,6 +264,7 @@ class InferenceServer:
                 pre_transpose=self.pre_transpose,
                 chunked_prefill_size=self.chunked_prefill_size,
                 enable_mixed_batching=self.enable_mixed_batching,
+                prioritize_prefill_resume=self.prioritize_prefill_resume,
             )
             self.engine.start()
             logger.info(f"Engine initialized with model at {self.model_path}")
@@ -788,6 +791,7 @@ def main():
         tool_call_parser=cfg.tool_call_parser,
         chunked_prefill_size=cfg.chunked_prefill_size,
         enable_mixed_batching=cfg.enable_mixed_batching,
+        prioritize_prefill_resume=cfg.prioritize_prefill_resume,
     )
     server.start()
 

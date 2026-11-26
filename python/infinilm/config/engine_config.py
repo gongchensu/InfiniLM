@@ -71,6 +71,7 @@ class EngineConfig:
     static_cache_capacity: int = 1
     chunked_prefill_size: int = 0
     enable_mixed_batching: bool = False
+    prioritize_prefill_resume: bool = False
 
     def __post_init__(self) -> None:
         if (

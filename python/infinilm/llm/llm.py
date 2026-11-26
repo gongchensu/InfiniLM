@@ -202,6 +202,7 @@ class LLMEngine:
                 ),
                 chunked_prefill_size=config.chunked_prefill_size,
                 enable_mixed_batching=config.enable_mixed_batching,
+                prioritize_prefill_resume=config.prioritize_prefill_resume,
             )
             if model_engine.model_type == "videonsa":
                 self.model_runner.bind_nsa_scheduler(self.scheduler)
@@ -571,6 +572,7 @@ class LLM:
         static_cache_capacity: int = 1,
         chunked_prefill_size: int = 0,
         enable_mixed_batching: bool = False,
+        prioritize_prefill_resume: bool = False,
     ):
         """Initialize LLM.
 
@@ -612,6 +614,7 @@ class LLM:
             static_cache_capacity=static_cache_capacity,
             chunked_prefill_size=chunked_prefill_size,
             enable_mixed_batching=enable_mixed_batching,
+            prioritize_prefill_resume=prioritize_prefill_resume,
             max_tokens=max_tokens,
             num_blocks=num_blocks,
             block_size=block_size,
@@ -803,6 +806,7 @@ class AsyncLLMEngine:
         static_cache_capacity: int = 1,
         chunked_prefill_size: int = 0,
         enable_mixed_batching: bool = False,
+        prioritize_prefill_resume: bool = False,
     ):
         """Initialize AsyncLLMEngine.
 
@@ -848,6 +852,7 @@ class AsyncLLMEngine:
             static_cache_capacity=static_cache_capacity,
             chunked_prefill_size=chunked_prefill_size,
             enable_mixed_batching=enable_mixed_batching,
+            prioritize_prefill_resume=prioritize_prefill_resume,
             max_tokens=max_tokens,
             num_blocks=num_blocks,
             block_size=block_size,

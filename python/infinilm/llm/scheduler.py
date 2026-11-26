@@ -196,6 +196,7 @@ class Scheduler:
         nsa_owner_pool_epoch: int | None = None,
         chunked_prefill_size: int = 0,
         enable_mixed_batching: bool = False,
+        prioritize_prefill_resume: bool = False,
     ):
         if nsa_owner_pool_epoch is not None and (
             connector is not None or has_mamba_cache
@@ -203,6 +204,7 @@ class Scheduler:
             raise ValueError("NSA owner slice excludes connectors and recurrent cache")
         self.waiting_queue = janus.Queue()
         self.running_queue = janus.Queue()
+        self._resuming_prefills: queue.Queue[InferenceRequest] = queue.Queue()
         self.max_batch_size = max_batch_size
 
         self.finished_receiving_kv_req_ids: set[str] = set()
@@ -283,6 +285,9 @@ class Scheduler:
             )
             enable_mixed_batching = False
         self.enable_mixed_batching = enable_mixed_batching
+        self.prioritize_prefill_resume = (
+            enable_mixed_batching and prioritize_prefill_resume
+        )
         if self.enable_mixed_batching and (
             has_mamba_cache or nsa_owner_pool_epoch is not None
         ):
@@ -335,6 +340,12 @@ class Scheduler:
                 except BaseException:
                     request._paged_submitted = False
                     raise
+
+    def _enqueue_prefill(self, request: InferenceRequest) -> None:
+        if self.prioritize_prefill_resume and request.chunked_prefill_pending:
+            self._resuming_prefills.put_nowait(request)
+        else:
+            self.waiting_queue.sync_q.put_nowait(request)
 
     def _ensure_scheduler_thread(self) -> None:
         """All cache/connector mutations run on one scheduler consumer thread."""
@@ -476,8 +487,10 @@ class Scheduler:
             and self.running_queue.sync_q.qsize() > 0
         )
 
-        # Process Waiting queue (prefill phase)
-        waiting_to_inspect = 0 if skip_waiting else self.waiting_queue.sync_q.qsize()
+        # Consume the optional resume queue before admitting waiting requests.
+        waiting_to_inspect = 0 if skip_waiting else (
+            self._resuming_prefills.qsize() + self.waiting_queue.sync_q.qsize()
+        )
         if retry_whole:
             waiting_to_inspect += 1
         while (
@@ -490,6 +503,8 @@ class Scheduler:
                 if self._whole_prefill_retry is not None:
                     req = self._whole_prefill_retry
                     self._whole_prefill_retry = None
+                elif not self._resuming_prefills.empty():
+                    req = self._resuming_prefills.get_nowait()
                 else:
                     req = self.waiting_queue.sync_q.get_nowait()
                 self._dequeued_request = req
@@ -724,9 +739,8 @@ class Scheduler:
 
             req.status = RequestStatus.RUNNING
 
-        if deferred_requests:
-            for req in deferred_requests:
-                self.waiting_queue.sync_q.put(req)
+        for req in deferred_requests:
+            self._enqueue_prefill(req)
 
         is_prefill = len(scheduled_requests) > num_decode_requests
         if not scheduled_requests and (not self.enable_mixed_batching or retry_whole):
@@ -932,12 +946,9 @@ class Scheduler:
                         f"Request {req.request_id[:8]}... timed out: {req.finish_reason}"
                     )
             else:
-                # A chunked prefill continues in the waiting
-                # queue; remaining prompt chunks are scheduled
-                # as prefill, not decode.
                 if req.chunked_prefill_pending:
                     req.status = RequestStatus.WAITING
-                    self.waiting_queue.sync_q.put(req)
+                    self._enqueue_prefill(req)
                 else:
                     # Still running, put back in running queue
                     self.running_queue.sync_q.put(req)
@@ -950,7 +961,9 @@ class Scheduler:
             finalize_request(req)
         if self._dequeued_request is not None:
             finalize_request(self._dequeued_request)
-        for work_queue in (self.waiting_queue.sync_q, self.running_queue.sync_q):
+        for work_queue in (
+            self._resuming_prefills, self.waiting_queue.sync_q, self.running_queue.sync_q
+        ):
             while True:
                 try:
                     req = work_queue.get_nowait()
@@ -967,7 +980,9 @@ class Scheduler:
         """
         self._ensure_scheduler_thread()
         seen = set()
-        for work_queue in (self.waiting_queue.sync_q, self.running_queue.sync_q):
+        for work_queue in (
+            self._resuming_prefills, self.waiting_queue.sync_q, self.running_queue.sync_q
+        ):
             while True:
                 try:
                     req = work_queue.get_nowait()
@@ -1032,27 +1047,14 @@ class Scheduler:
             total_required_blocks += num_blocks_needed
             self.running_queue.sync_q.put(req)
 
-        # Reserve capacity for incomplete chunked requests in the
-        # waiting queue: they already hold blocks for earlier chunks
-        # and will need more to finish their prompt and decode. Without
-        # this, several chunked requests can each pass admission and
-        # together hold every free block, deadlocking the scheduler.
-        waiting_queue_size = self.waiting_queue.sync_q.qsize()
-        for _ in range(waiting_queue_size):
-            other = self.waiting_queue.sync_q.get()
-            self.waiting_queue.sync_q.put(other)
-            if other is request or not other.chunked_prefill_pending:
-                continue
-            total_for_completion = (
-                other.get_prompt_length()
-                + other.sampling_params.max_tokens
-                + self.block_size
-                - 1
-            ) // self.block_size
-            total_required_blocks += max(
-                total_for_completion - len(other.block_table),
-                0,
-            )
+        # Incomplete prefills already hold pages and need more to finish.
+        # Reserve those pages before admitting another request.
+        for work_queue in (self._resuming_prefills, self.waiting_queue.sync_q):
+            for _ in range(work_queue.qsize()):
+                other = work_queue.get_nowait()
+                work_queue.put_nowait(other)
+                if other is not request and other.chunked_prefill_pending:
+                    total_required_blocks += self._get_prefill_extra_blocks(other)
 
         # Calculate blocks needed for the new request
         total_length = request.get_prompt_length() - num_local_computed_tokens
